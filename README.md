@@ -31,3 +31,7 @@ This is the second version — the first one worked but ran into issues with wir
 ---
 
 ## 🧩 Repository Structure
+ HEAD
+
+
+ 20da323 (Add project folder structure for Weatherstation2.0)
