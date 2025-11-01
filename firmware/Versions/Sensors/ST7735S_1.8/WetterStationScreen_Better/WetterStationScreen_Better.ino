@@ -5,8 +5,8 @@
 #define TFT_CS   16
 #define TFT_DC   17
 #define TFT_RST  18
-#define TFT_SDA  19
-#define TFT_SCL  20
+#define TFT_SDA  20
+#define TFT_SCL  21
 
 Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_SDA, TFT_SCL, TFT_RST);
 
