@@ -1,31 +1,39 @@
 # 🌦 WeatherStation 2.0
 
-## 1️⃣ Motivation / Lore
-WeatherStation 2.0 is the next iteration of my first version.  
-The original project attempted wireless sensor communication, but it wasn’t stable. 😅  
-It was initially made for a school project, but now I aim for a **professional, scalable, and reliable system**.  
-The new goal: multiple wireless nodes, optional cloud integration, local TFT/LCD/7-segment display, and modular sensor support — so I can monitor **environmental conditions in different rooms** at home. 🏠
+## 1️⃣ Motivation / Background
+**WeatherStation 2.0** is the successor of my first homemade weather station.  
+The original version aimed for wireless sensor communication but wasn’t stable enough. 😅  
+It began as a **school project**, but this version is designed as a **modular, scalable, and reliable system** with a more professional architecture.
+
+🎯 **Goal:**  
+Build a multi-node weather monitoring network with  
+- optional cloud integration,  
+- local display (TFT/LCD/7-segment),  
+- and modular sensor interfaces —  
+to observe environmental data in different rooms or locations. 🏠
 
 ---
 
 ## 2️⃣ Project Overview
-- **What is it?**  
-  A modular indoor weather station built around the ESP32, measuring **temperature, humidity, and light** in real time.  
-- **Display & GUI:** TFT color GUI as main interface, LCD 16x2 or 7-segment as fallback for minimal setups.  
-- **Reference diagram:**  
+- **Core Idea:**  
+  A modular indoor weather station built around the **ESP32**, measuring **temperature, humidity, and light** in real time.  
+- **Display System:**  
+  A color **TFT GUI** as main interface, with **LCD (16x2)** or **7-segment** fallback for minimal configurations.  
+- **System Topology:**  
   ![Fritzing Overview](docs/images/fritzing_overview.jpg)  
-  *(Example wiring and node layout using Fritzing)*
+  *(Fritzing layout showing node structure and sensor wiring)*
 
 ---
 
-## 3️⃣ GUI / Display Overview
-| Display Type | Library / Driver | Layout Highlights | Notes |
-|--------------|----------------|-----------------|-------|
-| TFT 2.4"/3.2" | MCUFRIEND_kbv | Color metrics: Temp, Humidity, Light; sub-second updates; customizable layout & colors | Main GUI; supports dual-node updates |
-| LCD 16x2 (I2C) | LiquidCrystal_I2C | Simple text: Temp/Humidity | Fallback for low-power setups |
-| 7-segment 4-digit (SPI) | TM1637 | Minimal display for key values (e.g., temperature alert) | Ultra-low-power, compact |
+## 3️⃣ Display & GUI Overview
+| Display Type | Library / Driver | Highlights | Notes |
+|--------------|-----------------|-------------|--------|
+| **TFT 2.4" / 3.2"** | `MCUFRIEND_kbv` | Full-color GUI with real-time updates (<1s), customizable layout & theme | Main interface, supports dual-node mode |
+| **LCD 16x2 (I2C)** | `LiquidCrystal_I2C` | Simple text-based readout (Temp/Humidity) | Low-power fallback |
+| **7-segment (TM1637)** | `TM1637Display` | Compact numeric output for key metrics | Ultra-low-power, minimal design |
 
-**Example TFT Layout:**  
+**Example Layout (TFT):**
+
 
 ┌───────────────────────────────┐
 │ WeatherStation │
@@ -43,42 +51,45 @@ The new goal: multiple wireless nodes, optional cloud integration, local TFT/LCD
 ---
 
 ## 4️⃣ Hardware Overview
-| Component | Model / Type | Purpose | Notes |
-|-----------|-------------|---------|-------|
-| Main Controller | ESP32 DevKit v1 / ESP32-WROOM-32 | Core processing, Wi-Fi, Bluetooth | Handles all sensor nodes & display |
-| Temp/Humidity Sensor | DHT22 / BME280 | Accurate temperature (±0.5°C) and humidity (±2%) | Modular connection |
-| Light Sensor | BH1750 | Measures ambient light intensity | Optional, configurable update rate |
-| Wireless Module | NRF24L01+ | Stable communication with remote nodes (~100 m) | Default wireless node protocol |
-| Backup Wireless | 433 MHz Transceiver | Long-range, low-power (~1 km) | Optional fallback |
-| Displays | TFT 2.4"/3.2", LCD 16x2, 7-segment | Displays environmental metrics | See GUI section for layout |
-| Input | Potentiometer 10kΩ | Adjust display contrast or navigate menus | Works with TFT and LCD |
-| Optional | Raspberry Pi Camera, PMS5003 | Time-lapse, particulate matter measurement | Expandable sensor modules |
+| Component | Model / Type | Function | Notes |
+|-----------|---------------|-----------|--------|
+| **Main Controller** | ESP32 DevKit v1 / ESP32-WROOM-32 | Core processor, Wi-Fi & Bluetooth | Handles sensors, display & wireless communication |
+| **Temp/Humidity Sensor** | DHT22 / BME280 | Measures temperature (±0.5°C) & humidity (±2%) | Plug-and-play modular |
+| **Light Sensor** | BH1750 | Ambient light intensity measurement | Adjustable update rate |
+| **Wireless Module** | NRF24L01+ | Stable communication between remote nodes (~100 m) | Default wireless backbone |
+| **Backup Link** | 433 MHz Transceiver | Long-range fallback (~1 km) | Optional |
+| **Displays** | TFT / LCD / 7-seg | Shows real-time environment data | GUI section for layout |
+| **Input** | 10kΩ Potentiometer | Contrast control or menu navigation | Multi-display compatible |
+| **Optional Sensors** | PMS5003, Camera Module | Air quality & time-lapse imaging | Expandable modular support |
 
-- **Schematics / Assembly Step-by-Step:**  
-  ![Step-by-Step Setup](docs/images/step_by_step.jpg)  
-  *(Step-by-step assembly documented with images and Fritzing diagrams)*
-
----
-
-## 5️⃣ Firmware / Code
-- **Quick link to code:** [WeatherStation Firmware](firmware/main/WeatherStation.ino) 💻  
-- Modular design: sensors, display, wireless communication abstracted.  
-- Supports **multiple nodes**, easy integration of new sensors without rewriting core logic.  
-- Configuration via JSON/YAML in `/firmware/config/`.
+📷 *Example schematic / assembly:*  
+![Assembly Example](docs/images/step_by_step.jpg)  
+*(Documented build process with Fritzing diagrams)*
 
 ---
 
-## 6️⃣ Measurements / Calculations
-- **PDF Reference:** [Test & Calculation](docs/WeatherStation_Test.pdf) 📊  
-- All environmental readings and formulas documented.  
-- Example outputs in `/examples/` folder.
+## 5️⃣ Firmware / Code Structure
+📁 **Firmware:** [`/firmware/main/WeatherStation.ino`](firmware/main/WeatherStation.ino)  
+🧩 **Config files:** JSON/YAML located in `/firmware/config/`
+
+- Modular codebase (sensors, display, wireless, config separated)  
+- Designed for **multi-node scalability**  
+- Plug-in style: add new sensors without touching the main loop  
 
 ---
 
-## 7️⃣ Network & Community
-- **Wireless Nodes:** NRF24L01 / 433 MHz, scalable up to 15+ nodes.  
-- **Contributing:** Open Issues & Pull Requests welcome.  
-- **Tips / Troubleshooting:** `/docs/troubleshooting.md`.
+## 6️⃣ Measurements & Calculations
+- 📘 Reference: [`docs/WeatherStation_Test.pdf`](docs/WeatherStation_Test.pdf)  
+- All measurement principles and formulas are documented.  
+- Sample output and test results in `/examples/`.
+
+---
+
+## 7️⃣ Networking & Collaboration
+- **Wireless Protocols:** NRF24L01 (default) / 433 MHz (fallback)  
+- **Max Nodes:** Tested up to 15+ nodes in single network  
+- **Contributing:** Open issues and PRs are welcome 🤝  
+- **Troubleshooting:** see `/docs/troubleshooting.md`
 
 ---
 
@@ -87,10 +98,18 @@ MIT License – see [LICENSE](LICENSE) 📜
 
 ---
 
-💡 **Highlights / Improvements:**  
-- Clean modular **folder structure** (`firmware/`, `hardware/`, `docs/`, `images/`, `examples/`)  
-- Improved **GUI table & ASCII mockup** for better readability  
-- Emojis to make sections immediately scannable 🌦📌🚀🛠️🎉🤝  
-- Step-by-step hardware visuals + Fritzing diagrams for clarity  
-- Modular approach for firmware & sensor expansion
+## 💡 Highlights / Key Improvements
+- Clean modular structure (`firmware/`, `hardware/`, `docs/`, `examples/`)  
+- Reworked GUI mockup for clarity and consistency  
+- Visual documentation with Fritzing and photo references  
+- Emoji-based sectioning for readability 🌦🛠️📊  
+- Git-ready folder hierarchy for multi-node development  
+- Scalable firmware architecture for IoT expansion 🚀  
 
+---
+
+### 🧰 Future Plans
+- MQTT / Web dashboard integration 🌐  
+- SD-card data logging  
+- Local time-sync (NTP)  
+- OTA updates for remote nodes  
