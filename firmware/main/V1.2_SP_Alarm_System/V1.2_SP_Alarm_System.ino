@@ -10,20 +10,34 @@ RTC_DS3231 rtc;
 #define TRIG_PIN 52
 #define ECHO_PIN 53
 
+// --- Ampel + Buzzer ---
+#define LED_GREEN  50
+#define LED_YELLOW 48
+#define LED_RED    46
+#define BUZZER     44
+
+// --- Button zum Testen ---
+#define BUTTON_PIN 26
+
+// --- Timing ---
 unsigned long lastUpdate = 0;
 const unsigned long updateInterval = 2000;  // ms
+
+// --- Funktionsprototypen ---
+float measureDistanceCM();
+void printSensorData();
+void triggerAlarm(float distance, float temperature, float pressure);
 
 void setup() {
   Serial.begin(115200);
   Serial1.begin(9600);
   Wire.begin();
 
-  Serial.println(F("🌦 Wetterstation startet..."));
+  Serial.println(F("🌦 Wetterstation v1.2 startet..."));
 
   // BMP
   if (!bmp.begin(0x76)) {
     Serial.println(F("❌ BMP280 nicht gefunden!"));
-    // kein infinite loop hier, wir wollen trotzdem RTC debuggen
   } else {
     Serial.println(F("✅ BMP280 verbunden"));
   }
@@ -35,29 +49,38 @@ void setup() {
     Serial.println(F("✅ RTC verbunden"));
   }
 
-  // Prüfen, ob RTC Power verloren hat (Batterie leer/fehlt)
   if (rtc.lostPower()) {
     Serial.println(F("⚠️ RTC meldet Stromverlust (lostPower()). Zeit ggf. nicht gesetzt."));
-    Serial.println(F("   -> Entweder Batterie installieren/prüfen oder Zeit per 'SET:' setzen."));
-    // Optional: Einmalig setzen auf Kompilierzeit (nur aktivieren, wenn du willst):
-    // rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
-    // Serial.println(F("RTC auf Kompilierzeit gesetzt. Kommentiere rtc.adjust() danach aus."));
   }
 
+  // Ultraschall-Pins
   pinMode(TRIG_PIN, OUTPUT);
   pinMode(ECHO_PIN, INPUT);
 
+  // Ampel + Buzzer
+  pinMode(LED_RED, OUTPUT);
+  pinMode(LED_YELLOW, OUTPUT);
+  pinMode(LED_GREEN, OUTPUT);
+  pinMode(BUZZER, OUTPUT);
+
+  // Button
+  pinMode(BUTTON_PIN, INPUT_PULLUP);
+
+  // Alles aus
+  digitalWrite(LED_RED, LOW);
+  digitalWrite(LED_YELLOW, LOW);
+  digitalWrite(LED_GREEN, HIGH); // Standard: Grün an
+  digitalWrite(BUZZER, LOW);
+
   Serial.println(F("Setup abgeschlossen."));
-  Serial.println(F("Befehle: Sende 'SET:YYYY-MM-DD HH:MM:SS' um die Uhr zu setzen."));
+  Serial.println(F("Drücke Button zum Testen des Alarms."));
   Serial.println();
 }
 
-// Hilfs: parse "YYYY-MM-DD HH:MM:SS"
+// Hilfs: parse "SET:YYYY-MM-DD HH:MM:SS"
 bool parseAndSetRTC(const String &s) {
-  // Erwartetes Format: "SET:2025-11-03 12:34:56"
   if (!s.startsWith("SET:")) return false;
   String body = s.substring(4);
-  // sicherstellen, Länge passt
   if (body.length() < 19) return false;
 
   int Y = body.substring(0,4).toInt();
@@ -67,9 +90,7 @@ bool parseAndSetRTC(const String &s) {
   int M = body.substring(14,16).toInt();
   int S = body.substring(17,19).toInt();
 
-  if (Y < 2000 || m<1 || m>12 || d<1 || d>31 || H<0 || H>23 || M<0 || M>59 || S<0 || S>59) {
-    return false;
-  }
+  if (Y < 2000 || m<1 || m>12 || d<1 || d>31 || H<0 || H>23 || M<0 || M>59 || S<0 || S>59) return false;
 
   DateTime dt(Y, m, d, H, M, S);
   rtc.adjust(dt);
@@ -77,7 +98,19 @@ bool parseAndSetRTC(const String &s) {
 }
 
 void loop() {
-  // Serielle Eingaben verarbeiten (für SET:)
+  // Button prüfen (Test-Alarm)
+  if (digitalRead(BUTTON_PIN) == LOW) {
+    Serial.println("🔔 Button gedrückt: Test-Alarm!");
+    digitalWrite(LED_RED, HIGH);
+    digitalWrite(LED_YELLOW, LOW);
+    digitalWrite(LED_GREEN, LOW);
+    tone(BUZZER, 1000, 500);
+    delay(500);
+    digitalWrite(LED_RED, LOW);
+    digitalWrite(LED_GREEN, HIGH);
+  }
+
+  // Serial-Befehle für RTC SET:
   if (Serial.available()) {
     String line = Serial.readStringUntil('\n');
     line.trim();
@@ -90,33 +123,40 @@ void loop() {
     }
   }
 
+  // periodisch Sensorwerte ausgeben
   if (millis() - lastUpdate >= updateInterval) {
     lastUpdate = millis();
     printSensorData();
   }
 }
 
+// ---------- Sensorfunktionen ----------
+float measureDistanceCM() {
+  digitalWrite(TRIG_PIN, LOW);
+  delayMicroseconds(3);
+  digitalWrite(TRIG_PIN, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(TRIG_PIN, LOW);
+
+  long duration = pulseIn(ECHO_PIN, HIGH, 25000);
+  if (duration == 0) return -1;
+  return (duration * 0.0343) / 2.0;
+}
+
 void printSensorData() {
-  // BMP
   float temperature = NAN;
   float pressure = NAN;
-  if (bmp.begin(0x76)) { // falls bmp.begin() vorher fehlgeschlagen ist, versuchen wir nicht nochmal endlos
+
+  if (bmp.begin(0x76)) {
     temperature = bmp.readTemperature();
     pressure = bmp.readPressure() / 100.0F;
-  } else if (bmp.readTemperature() != bmp.readTemperature()) {
-    // noop - bmp nicht vorhanden
   }
 
-  // Ultraschall
   float distance = measureDistanceCM();
 
-  // RTC Zeit
   DateTime now = rtc.now();
   char timeString[20];
   snprintf(timeString, sizeof(timeString), "%02d:%02d:%02d", now.hour(), now.minute(), now.second());
-
-  // Unix time (zum Debuggen, wie Sekunden laufen)
-  unsigned long unix = now.unixtime();
 
   Serial.println(F("----------- Messdaten -----------"));
   if (!isnan(temperature)) {
@@ -132,25 +172,39 @@ void printSensorData() {
     Serial.println(F("📏 Entfernung: keine Messung (Timeout)"));
   }
 
-  Serial.print(F("⏰ Zeit:        ")); Serial.println(timeString);
-  Serial.print(F("Unix Time:     ")); Serial.println(unix); // sehr hilfreich zum prüfen ob Sekunden korrekt laufen
+  Serial.print(F("⏰ Zeit:       ")); Serial.println(timeString);
   Serial.println(F("--------------------------------\n"));
 
   // optional an Funk
   Serial1.print(F("TEMP:")); Serial1.println(temperature);
   Serial1.print(F("PRESS:")); Serial1.println(pressure);
   Serial1.print(F("DIST:")); Serial1.println(distance);
+
+  // Ampel + Alarm automatisch steuern
+  triggerAlarm(distance, temperature, pressure);
 }
 
-float measureDistanceCM() {
-  digitalWrite(TRIG_PIN, LOW);
-  delayMicroseconds(3);
-  digitalWrite(TRIG_PIN, HIGH);
-  delayMicroseconds(10);
-  digitalWrite(TRIG_PIN, LOW);
+// ---------- Ampel + Alarmlogik ----------
+void triggerAlarm(float distance, float temperature, float pressure) {
+  // Standardzustand
+  digitalWrite(LED_RED, LOW);
+  digitalWrite(LED_YELLOW, LOW);
+  digitalWrite(LED_GREEN, HIGH);
+  digitalWrite(BUZZER, LOW);
 
-  long duration = pulseIn(ECHO_PIN, HIGH, 25000);
-  if (duration == 0) return -1;
-  float distance = (duration * 0.0343) / 2.0;
-  return distance;
+  // Logik: z.B. Abstand < 10cm oder Temperatur > 40°C -> Alarm
+  if ((distance >= 0 && distance < 10) || (!isnan(temperature) && temperature > 40)) {
+    digitalWrite(LED_RED, HIGH);
+    digitalWrite(LED_GREEN, LOW);
+    tone(BUZZER, 1000, 500);
+  } 
+  // Abstand < 20cm -> Warnung
+  else if (distance >= 0 && distance < 20) {
+    digitalWrite(LED_YELLOW, HIGH);
+    digitalWrite(LED_GREEN, LOW);
+  } 
+  // Alles ok
+  else {
+    digitalWrite(LED_GREEN, HIGH);
+  }
 }
