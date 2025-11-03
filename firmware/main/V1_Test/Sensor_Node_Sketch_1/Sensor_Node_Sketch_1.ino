@@ -1,4 +1,31 @@
-// === Master: mega_master_display.ino ===
+// ==============================================
+// WeatherStation 2.0 Master - mega_master_display.ino
+// ==============================================
+// Zweck: I2C-Sklaven-Sensoren abfragen und Empfangene Daten auf TFT-Display anzeigen.
+// Bibliotheken: Wire (I2C-Kommunikation), Adafruit_ST7735 (TFT-Display), Adafruit_GFX (Grundgrafik).
+// Hardware:
+//   - TFT-Display Pins: CS=10, DC=9, RST=8 (1.8"/2.4" ST7735-Display)
+//   - I2C-Sklaven: Adressen 0x10 (Sensor1), 0x11 (Sensor2); max. 8 Slaves unterstützt.
+// Intervalle:
+//   - Vollständige Poll-Runde alle 1500ms (POLL_INTERVAL)
+//   - Zwischen individuellen Sklaven-Abfragen 100ms Pause (PER_SLAVE_DELAY)
+// Datenfluss:
+//   1. Master fragt jeden Sklaven über I2C nach Daten (max. 64 Bytes pro Anfrage)
+//   2. Empfangene String-Daten (Format: "ID,TEMP,PRESS,ALT,DIST,AMP") werden geparsed
+//   3. gültige Daten werden in SlaveData-Struktur (Array slaves[8]) gespeichert
+//   4. alle 1.5s werden Daten auf Display gerendert (ID, Temp, Pressure, Distance, Ampel-Zustand)
+// Anzeige:
+//   - Titel: "WeatherStation 2.0" + Trennlinie
+//   - Jeder gültige Sklave: ID (Cyan), Temp (°C), Pressure (hPa), Distance (cm), Ampel-Status (Text)
+//   - Stoppt bei y>140, um Überfluss auf Display zu vermeiden
+// Fehlerbehandlung:
+//   - Keine Antwort von Sklaven: markiert diesen als ungültig (valid=false)
+//   - Ungültige/leere Daten: N/A für fehlende Werte, NAN für Floats
+// Limitationen:
+//   - Altitude-Daten gespeichert, aber nicht auf Display angezeigt (Funktionserweiterung möglich)
+//   - Debug-Log über Serial (115200 Baud)
+// ==============================================
+
 // Dieses Sketch verwaltet einen Masterknoten, der über I2C-Schnittstelle Daten von Sklaven-Sensoren sammelt und diese auf einem TFT-Display anzeigt.
 
 // Bibliotheken einbinden
