@@ -153,4 +153,4 @@ float measureDistanceCM() {
   if (duration == 0) return -1;
   float distance = (duration * 0.0343) / 2.0;
   return distance;
-}
+} okokokokok  cool und jz unabhöngig von der lettztenn kommentiere mir bitte auch so krass wie vorher die datei mit klare eklärung und guidance pls 
