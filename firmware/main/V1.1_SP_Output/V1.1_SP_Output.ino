@@ -3,92 +3,154 @@
 #include <RTClib.h>
 
 // --- Sensoren definieren ---
-Adafruit_BMP280 bmp;       // BMP280: Temperatur + Druck
-RTC_DS3231 rtc;            // Echtzeituhr-Modul (z. B. DS3231)
+Adafruit_BMP280 bmp;       
+RTC_DS3231 rtc;            
 
-// --- Ultraschallsensor-Pins ---
+// --- Ultraschall ---
 #define TRIG_PIN 52
 #define ECHO_PIN 53
 
-// --- Zeitvariablen ---
 unsigned long lastUpdate = 0;
-const unsigned long updateInterval = 2000;  // alle 2 Sekunden neue Messung
+const unsigned long updateInterval = 2000;  // ms
 
 void setup() {
-  Serial.begin(115200);     // Monitor
-  Serial1.begin(9600);      // Funkmodul (TX1=18, RX1=19)
-  Wire.begin();             // I2C starten (SDA=20, SCL=21)
+  Serial.begin(115200);
+  Serial1.begin(9600);
+  Wire.begin();
 
   Serial.println(F("🌦 Wetterstation startet..."));
 
-  // --- BMP280 initialisieren ---
-  if (!bmp.begin(0x76)) {   // Adresse kann 0x76 oder 0x77 sein
+  // BMP
+  if (!bmp.begin(0x76)) {
     Serial.println(F("❌ BMP280 nicht gefunden!"));
-    while (1);
+    // kein infinite loop hier, wir wollen trotzdem RTC debuggen
   } else {
     Serial.println(F("✅ BMP280 verbunden"));
   }
 
-  // --- RTC initialisieren ---
+  // RTC
   if (!rtc.begin()) {
-    Serial.println(F("❌ RTC-Modul nicht gefunden!"));
+    Serial.println(F("❌ RTC-Modul nicht gefunden! Prüfe SDA/SCL und VCC/GND"));
   } else {
     Serial.println(F("✅ RTC verbunden"));
   }
 
-  // --- Ultraschallsensor vorbereiten ---
+  // Prüfen, ob RTC Power verloren hat (Batterie leer/fehlt)
+  if (rtc.lostPower()) {
+    Serial.println(F("⚠️ RTC meldet Stromverlust (lostPower()). Zeit ggf. nicht gesetzt."));
+    Serial.println(F("   -> Entweder Batterie installieren/prüfen oder Zeit per 'SET:' setzen."));
+    // Optional: Einmalig setzen auf Kompilierzeit (nur aktivieren, wenn du willst):
+    // rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+    // Serial.println(F("RTC auf Kompilierzeit gesetzt. Kommentiere rtc.adjust() danach aus."));
+  }
+
   pinMode(TRIG_PIN, OUTPUT);
   pinMode(ECHO_PIN, INPUT);
 
-  Serial.println(F("Setup abgeschlossen.\n"));
+  Serial.println(F("Setup abgeschlossen."));
+  Serial.println(F("Befehle: Sende 'SET:YYYY-MM-DD HH:MM:SS' um die Uhr zu setzen."));
+  Serial.println();
+}
+
+// Hilfs: parse "YYYY-MM-DD HH:MM:SS"
+bool parseAndSetRTC(const String &s) {
+  // Erwartetes Format: "SET:2025-11-03 12:34:56"
+  if (!s.startsWith("SET:")) return false;
+  String body = s.substring(4);
+  // sicherstellen, Länge passt
+  if (body.length() < 19) return false;
+
+  int Y = body.substring(0,4).toInt();
+  int m = body.substring(5,7).toInt();
+  int d = body.substring(8,10).toInt();
+  int H = body.substring(11,13).toInt();
+  int M = body.substring(14,16).toInt();
+  int S = body.substring(17,19).toInt();
+
+  if (Y < 2000 || m<1 || m>12 || d<1 || d>31 || H<0 || H>23 || M<0 || M>59 || S<0 || S>59) {
+    return false;
+  }
+
+  DateTime dt(Y, m, d, H, M, S);
+  rtc.adjust(dt);
+  return true;
 }
 
 void loop() {
+  // Serielle Eingaben verarbeiten (für SET:)
+  if (Serial.available()) {
+    String line = Serial.readStringUntil('\n');
+    line.trim();
+    if (line.length() > 0) {
+      if (parseAndSetRTC(line)) {
+        Serial.println(F("✅ RTC gesetzt via SET-Befehl."));
+      } else {
+        Serial.println(F("❌ Ungültiges SET-Format oder Befehl. Verwende: SET:YYYY-MM-DD HH:MM:SS"));
+      }
+    }
+  }
+
   if (millis() - lastUpdate >= updateInterval) {
     lastUpdate = millis();
     printSensorData();
   }
 }
 
-// ---------- Messfunktionen ----------
-
 void printSensorData() {
-  // --- BMP280 auslesen ---
-  float temperature = bmp.readTemperature();
-  float pressure = bmp.readPressure() / 100.0F;  // in hPa
+  // BMP
+  float temperature = NAN;
+  float pressure = NAN;
+  if (bmp.begin(0x76)) { // falls bmp.begin() vorher fehlgeschlagen ist, versuchen wir nicht nochmal endlos
+    temperature = bmp.readTemperature();
+    pressure = bmp.readPressure() / 100.0F;
+  } else if (bmp.readTemperature() != bmp.readTemperature()) {
+    // noop - bmp nicht vorhanden
+  }
 
-  // --- Ultraschall messen ---
+  // Ultraschall
   float distance = measureDistanceCM();
 
-  // --- Zeit abrufen ---
+  // RTC Zeit
   DateTime now = rtc.now();
   char timeString[20];
-  sprintf(timeString, "%02d:%02d:%02d", now.hour(), now.minute(), now.second());
+  snprintf(timeString, sizeof(timeString), "%02d:%02d:%02d", now.hour(), now.minute(), now.second());
 
-  // --- Ausgabe auf Serial-Monitor ---
+  // Unix time (zum Debuggen, wie Sekunden laufen)
+  unsigned long unix = now.unixtime();
+
   Serial.println(F("----------- Messdaten -----------"));
-  Serial.print(F("🌡 Temperatur: ")); Serial.print(temperature, 1); Serial.println(F(" °C"));
-  Serial.print(F("🌬 Luftdruck:  ")); Serial.print(pressure, 1); Serial.println(F(" hPa"));
-  Serial.print(F("📏 Entfernung: ")); Serial.print(distance, 1); Serial.println(F(" cm"));
+  if (!isnan(temperature)) {
+    Serial.print(F("🌡 Temperatur: ")); Serial.print(temperature,1); Serial.println(F(" °C"));
+    Serial.print(F("🌬 Luftdruck:  ")); Serial.print(pressure,1); Serial.println(F(" hPa"));
+  } else {
+    Serial.println(F("🌡 BMP280: nicht verfügbar"));
+  }
+
+  if (distance >= 0) {
+    Serial.print(F("📏 Entfernung: ")); Serial.print(distance,1); Serial.println(F(" cm"));
+  } else {
+    Serial.println(F("📏 Entfernung: keine Messung (Timeout)"));
+  }
+
   Serial.print(F("⏰ Zeit:        ")); Serial.println(timeString);
+  Serial.print(F("Unix Time:     ")); Serial.println(unix); // sehr hilfreich zum prüfen ob Sekunden korrekt laufen
   Serial.println(F("--------------------------------\n"));
 
-  // --- Optional: Werte ans Funkmodul senden ---
-  Serial1.print("TEMP:"); Serial1.println(temperature);
-  Serial1.print("PRESS:"); Serial1.println(pressure);
-  Serial1.print("DIST:"); Serial1.println(distance);
+  // optional an Funk
+  Serial1.print(F("TEMP:")); Serial1.println(temperature);
+  Serial1.print(F("PRESS:")); Serial1.println(pressure);
+  Serial1.print(F("DIST:")); Serial1.println(distance);
 }
 
-// ---------- Hilfsfunktion: HC-SR04 ----------
 float measureDistanceCM() {
   digitalWrite(TRIG_PIN, LOW);
-  delayMicroseconds(2);
-
+  delayMicroseconds(3);
   digitalWrite(TRIG_PIN, HIGH);
   delayMicroseconds(10);
   digitalWrite(TRIG_PIN, LOW);
 
-  long duration = pulseIn(ECHO_PIN, HIGH, 25000); // Timeout nach 25ms (~4m)
-  float distance = duration * 0.0343 / 2;         // cm
+  long duration = pulseIn(ECHO_PIN, HIGH, 25000);
+  if (duration == 0) return -1;
+  float distance = (duration * 0.0343) / 2.0;
   return distance;
 }
