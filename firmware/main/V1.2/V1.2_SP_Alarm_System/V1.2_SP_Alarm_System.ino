@@ -7,14 +7,14 @@ Adafruit_BMP280 bmp;
 RTC_DS3231 rtc;            
 
 // --- Ultraschall ---
-#define TRIG_PIN 52
-#define ECHO_PIN 53
+#define TRIG_PIN 43
+#define ECHO_PIN 42
 
 // --- Ampel + Buzzer ---
-#define LED_GREEN  50
-#define LED_YELLOW 48
-#define LED_RED    46
-#define BUZZER     44
+#define LED_GREEN  51
+#define LED_YELLOW 50
+#define LED_RED    49
+#define BUZZER     53
 
 // --- Button zum Testen ---
 #define BUTTON_PIN 26

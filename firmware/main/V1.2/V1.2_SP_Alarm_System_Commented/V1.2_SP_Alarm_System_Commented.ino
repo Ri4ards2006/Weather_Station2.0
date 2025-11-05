@@ -45,9 +45,9 @@ RTC_DS3231 rtc;
 // 3. Pin Definitions (Ultrasonic Sensor)
 // ---------------------------
 // Ultrasonic Trigger Pin (TRIG): Sends a short pulse to start distance measurement (OUTPUT).
-#define TRIG_PIN 52        
+#define TRIG_PIN 43     
 // Ultrasonic Echo Pin (ECHO): Receives the reflected pulse from the measured object (INPUT).
-#define ECHO_PIN 53        
+#define ECHO_PIN 42   
 // ==============================================
 
 // ---------------------------
@@ -55,14 +55,14 @@ RTC_DS3231 rtc;
 // ---------------------------
 // Traffic Light LEDs (OUTPUT Pins):
 // - Green LED: Signals normal conditions (LOW = off, HIGH = on)
-#define LED_GREEN  50     
+#define LED_GREEN  51     
 // - Yellow LED: Signals warning conditions (LOW = off, HIGH = on)
-#define LED_YELLOW 48     
+#define LED_YELLOW 50     
 // - Red LED: Signals critical conditions (LOW = off, HIGH = on)
-#define LED_RED    46     
+#define LED_RED    49     
 
 // Buzzer Pin (OUTPUT): Sounds alarms when triggered (LOW = off, HIGH = on via tone())
-#define BUZZER     44      
+#define BUZZER     53      
 // ==============================================
 
 // ---------------------------
@@ -260,8 +260,9 @@ void loop() {
   // ---------------------------
   // Checks if serial data is available (e.g., user input via Serial Monitor)
   if (Serial.available()) {          
-    // Reads entire line until newline (\n), trims leading/trailing whitespace
-    String line = Serial.readStringUntil('\n').trim();  
+    String line = Serial.readStringUntil('\n');
+    line.trim();
+
     // Validates line is not empty after trimming
     if (line.length() > 0) {         
       // Attempts to parse and set RTC time using the SET command
