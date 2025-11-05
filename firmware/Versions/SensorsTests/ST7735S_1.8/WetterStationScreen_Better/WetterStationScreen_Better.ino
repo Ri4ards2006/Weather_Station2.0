@@ -2,9 +2,9 @@
 #include <Adafruit_ST7735.h>
 #include <SPI.h>
 
-#define TFT_CS   16
-#define TFT_DC   17
-#define TFT_RST  18
+#define TFT_CS   44
+#define TFT_DC   47
+#define TFT_RST  46
 #define TFT_SDA  20
 #define TFT_SCL  21
 
