@@ -1,2 +1,3 @@
 test dual push
 test dual push
+test peak speedflow
